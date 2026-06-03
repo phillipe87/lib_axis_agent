@@ -58,3 +58,89 @@ struct axis_if {
   uint8_t* tkeep  = nullptr;
   uint8_t* tlast  = nullptr;
  };
+
+ /**
+  * @brief One AXI-Stream transfer.
+  *
+  * Captures the state of TDATA, TKEEP, and TLAST during an acknowledged transfer.
+  *
+  * @tparam BYTES Data bus width in bytes.
+  */
+template <unsigned BYTES>
+struct axis_transfer {
+  uint8_t tdata[BYTES] = {};    ///< Data bytes for each lane
+  uint8_t tkeep[BYTES] = {};    ///< BYte-enable
+  bool    tlast        = false; ///< Last transfer indicator
+
+  /**
+   * @brief Build a transfer from an array of valid bytes.
+   *
+   * Fills @c tdata and @c tkeep from @p src for the first @p n_valid bytes.
+   * Bytes beyond @p n_valid have @c tkeep=0.
+   * Sets @c tlast to @p last.
+   *
+   * @param src     Pointer to byte array (left-justified).
+   * @param n_valid Number of valid bytes in @p src. May be less than BYTES.
+   * @param last    Value to assign @c tlast.
+   * @return        Populated axis_transfer.
+   */
+  static axis_transfer from_bytes(const uint8_t* src, unsigned n_valid, bool last) {
+    axis_transfer transfer;
+
+    for (unsigned i = 0; i < BYTES; i++) {
+      if (i < n_valid) {
+        transfer.tdata[i] = src[i];
+        transfer.tkeep[i] = 1;
+      }
+      else {
+        transfer.tdata[i] = 0;
+        transfer.tkeep[i] = 0;
+      }
+    }
+
+    transfer.tlast = last;
+
+    return transfer;
+  }
+};
+
+
+
+/**
+ * @brief Sequence of transfers forming one AXI-Stream transaction.
+ *
+ * A transaction ends with the transfer that has @c tlast=1.
+ *
+ * @tparam BYTES Data bus width in bytes.
+ */
+template <unsigned BYTES>
+struct axis_transaction {
+  std::vector<axis_transfer> transfers; ///< Transfers making up the transaction
+
+  /**
+   * @brief Build a transaction from a byte vector.
+   *
+   * Splits @p data into BYTES-wide transfers.
+   * The last transfer has @c tlast asserted.
+   * @c tkeep for the invalid bytes in partial final transfers is deasserted.
+   *
+   * @param data Payload bytes buffer.
+   * @return     Populated axis_transaction.
+   */
+  static axis_transaction from_bytes(const std::vector<uint8_t>& data) {
+    axis_transaction txn;
+    unsigned off = 0;
+
+    //TODO: throw exception if data is empty?
+    while (off < data.size()) {
+      unsigned remaining = static_cast<unsigned>(data.size()) - off;
+      bool     last      = (remaining <= BYTES);
+
+      txn.transfers.push_back(
+        axis_transfer<BYTES>::from_bytes(data.data() + off, remaining, last));
+
+      off += BYTES;
+    }
+  }
+};
+
