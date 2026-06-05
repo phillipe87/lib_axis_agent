@@ -21,6 +21,11 @@
  *
  */
 
+ #include <cstdint>
+ #include <vector>
+ #include <queue>
+ #include <cstring>
+
 /**
  * @brief DUT interface
  *
@@ -142,5 +147,103 @@ struct axis_transaction {
       off += BYTES;
     }
   }
+
+  /**
+   * @brief Returns true if transaction contains no transfers.
+   */
+  bool empty() const {
+    return transfers.empty();
+  }
 };
 
+
+/**
+ * @brief AXI-Stream Master Driver
+ *
+ * Drives AXI-Stream bus on MASTER @ref axis_if.
+ *
+ * ### Usage
+ *
+ * @code
+ * axis_master_driver<4> driver(in_if);
+ * driver.send_bytes({0xDE, 0xAD, 0xBE, 0xEF});
+ *
+ * // In clock loop, before dut->eval();
+ * driver.eval();
+ * @endcode
+ *
+ * @tparam BYTES Data bus width in bytes.
+ */
+template <unsigned BYTES>
+class axis_master_driver {
+  public:
+    using Transaction = axis_transaction<BYTES>;
+    using Transfer    = axis_transfer<BYTES>;
+
+    /**
+     * @brief Callback type invoked when transaction finishes transmitting.
+     * @param txn the completed transaction.
+     */
+    using DoneCB =  std::function<void(const Transaction& txn)>;
+
+    /**
+     * @brief Constructs a master driver bound to @p mif.
+     *
+     * @param mif   Master AXI-Stream interface to the DUT.
+     * @param done  Optional callback evoked after transmission is done.
+     *
+     * @throws std::invalid_argument if @p mif.direction != MASTER.
+     */
+    explicit axis_master_driver(const axis_if<BYTES>& mif, DoneCB done = nullptr);
+
+    /**
+     * @brief Transmits data bytes contained in an axis_transaction struct.
+     *
+     * @param txn Transaction to send.
+     */
+    void send_txn(const Transaction& txn);
+
+
+    /**
+     * @brief Transmits data bytes contained in a buffer in an AxI-Stream transaction.
+     *
+     * @param byte_vec Byte vector to send as a single transaction.
+     */
+    void send_bytes(const std::vector<uint8_t>& byte_vec);
+
+    /**
+     * @brief Advance the driver component by one clock cycle.
+     *
+     * Must be called on every rising clock edge before dut->eval().
+     */
+    void eval();
+
+    /**
+     * @brief Returns true when the queue is empty and no transfer is in flight.
+     */
+    bool is_idle() const;
+
+    /**
+     * @brief Returns the number of transactions currently waiting in the queue.
+     */
+    std::size_t queued_transactions() const;
+
+    /**
+     * @brief Replace the done callback.
+     *
+     * @param cb New callback, or nullprt to disable.
+     */
+    void set_done_cb(DoneCB cb);
+
+  private:
+    axis_if<BYTES>          mif_;
+    DoneCB                  done_;
+    std::queue<Transaction> queue_;
+    Transaction             current_txn_;
+    unsigned                transfer_idx_     = 0;
+    bool                    transfer_pending_ = false;
+
+    void drive(const Transfer& t);
+    void deassert();
+    void advance();
+};
