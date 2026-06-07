@@ -247,3 +247,83 @@ class axis_master_driver {
     void deassert();
     void advance();
 };
+
+
+/**
+ * @brief AXI-Stream Monitor
+ *
+ * Captures AXI-Stream bus traffic to and from the DUT.
+ *
+ * Stores completed transactions in an internal queue that
+ * can be retrieved with @ref pop_transaction().
+ *
+ * A callback can be fired on each completed transaction
+ *
+ * ### Usage
+ *
+ * @code
+ * axis_monitor<4> mon(_if, on_monitor_txn);
+ * driver.send_bytes({0xDE, 0xAD, 0xBE, 0xEF});
+ *
+ * // In clock loop, after dut->eval();
+ * mon.eval();
+ * @endcode
+ *
+ * @tparam BYTES Data bus width in bytes.
+ */
+template <unsigned BYTES>
+class axis_monitor {
+  public:
+    using Transaction = axis_transaction<BYTES>;
+
+    /**
+     * @brief Callback type invoked when a complete transaction is captured.
+     * @param txn the completed transaction.
+     */
+    using TxnCB =  std::function<void(const Transaction& txn)>;
+
+    /**
+     * @brief Constructs a monitor bound to @p iface.
+     *
+     * @param iface  Master AXI-Stream interface to the DUT.
+     * @param on_txn Optional callback evoked after transmission is done.
+     */
+    explicit axis_monitor(const axis_if<BYTES>& iface, TxnCB on_txn = nullptr);
+
+    /**
+     * @brief Sample the bus and update internal state.
+     *
+     * Must be called on every rising clock edge after @c dut->eval().
+     */
+    void eval();
+
+    /**
+     * @brief Returns TRUE if there is at least one transaction in the queue.
+     */
+    bool has_transaction() const;
+
+    /**
+     * @brief Remove and return the oldest completed transaction from the queue.
+     *
+     * @return The oldest completed transaction.
+     */
+    Transaction pop_transaction();
+
+    /**
+     * @brief Returns the number of completed transactions currently queued.
+     */
+    std::size_t rx_count() const;
+
+    /**
+     * @brief Replace the on_txn callback.
+     *
+     * @param cb New callback, or nullptr to disable.
+     */
+    void set_transaction_cb(TxnCB cb);
+
+  private:
+    axis_if<BYTES>          iface_;
+    TxnCB                   on_txn_;
+    std::queue<Transaction> rx_queue_;
+    Transaction             current_;
+};
