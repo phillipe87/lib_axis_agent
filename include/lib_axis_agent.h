@@ -7,9 +7,17 @@
  * Single header containing all declarations for the lib_axis_agent library.
  *
  * ## Components
- * | Class          | Role                                              |
- * |----------------|---------------------------------------------------|
- * | axis_if<BYTES> | DUT signal interface (pointer bundle + direction) |
+ * | Class                     | Role                                              |
+ * |---------------------------|---------------------------------------------------|
+ * | axis_if<BYTES>            | DUT signal interface (pointer bundle + direction) |
+ * |---------------------------|---------------------------------------------------|
+ * | axis_transfer<BYTES>      | AXI-Stream transfer container                     |
+ * |---------------------------|---------------------------------------------------|
+ * | axis_transaction<BYTES>   | AXI-Stream transaction container                  |
+ * |---------------------------|---------------------------------------------------|
+ * | axis_master_driver<BYTES> | AXI-Stream transmitter component                  |
+ * |---------------------------|---------------------------------------------------|
+ * | axis_monitor<BYTES>       | AXI-Stream monitor                                |
  *
  * ## Clock discipline
  * Call components in this order on every rising clock edge:

@@ -19,6 +19,7 @@ axis_master_driver<BYTES>::axis_master_driver(const axis_if<BYTES>& mif, DoneCB 
     deassert();
   }
 }
+
 //-------------------------------------
 // Public
 //-------------------------------------
