@@ -29,10 +29,12 @@
  *
  */
 
+ #include "verilated.h"
  #include <cstdint>
  #include <vector>
  #include <queue>
  #include <cstring>
+ #include <functional>
 
 /**
  * @brief DUT interface
@@ -65,11 +67,68 @@ struct axis_if {
 
   Direction direction = MASTER; ///< Direction of this interface instance
 
+  // Pointers to DUT ports
   uint8_t* tvalid = nullptr;
   uint8_t* tready = nullptr;
-  uint8_t* tdata  = nullptr;
-  uint8_t* tkeep  = nullptr;
   uint8_t* tlast  = nullptr;
+  void*    tdata  = nullptr;
+  void*    tkeep  = nullptr;
+
+  // For agent's internal use
+  uint8_t data[BYTES] = {};
+  uint8_t keep[BYTES] = {};
+
+  /**
+   * @brief Synchronize with the DUT
+   *
+   */
+  void update() {
+    if (direction == MASTER) { // To DUT
+      if (tdata) {
+        if constexpr (BYTES == 1) {
+          *static_cast<CData*>(tdata) = data[0];
+        } else if (BYTES == 2) {
+          SData v;
+          std::memcpy(&v,data,BYTES);
+          *static_cast<SData*>(tdata) = v;
+        } else if (BYTES == 4) {
+          IData v;
+          std::memcpy(&v,data,BYTES);
+          *static_cast<IData*>(tdata) = v;
+        } else if (BYTES == 8) {
+          QData v;
+          std::memcpy(&v,data,BYTES);
+          *static_cast<QData*>(tdata) = v;
+        }
+      } // tdata
+
+      if (tkeep) {
+        *static_cast<CData*>(tkeep) = keep[0];
+      } // tkeep
+
+    } else { // From DUT
+      if (tdata) {
+        if constexpr (BYTES == 1) {
+          data[0] = *static_cast<CData*>(tdata);
+        } else if (BYTES == 2) {
+          SData v;
+          v = *static_cast<SData*>(tdata);
+          std::memcpy(data,&v,BYTES);
+        } else if (BYTES == 4) {
+          IData v;
+          v = *static_cast<SData*>(tdata);
+          std::memcpy(data,&v,BYTES);
+        } else if (BYTES == 8) {
+          QData v;
+          v = *static_cast<QData*>(tdata);
+          std::memcpy(data,&v,BYTES);
+        }
+      }
+
+      if (tkeep) {
+        keep[0] = *static_cast<CData*>(tkeep);
+      }
+  } // if (direction == MASTER)
  };
 
  /**
@@ -128,7 +187,7 @@ struct axis_transfer {
  */
 template <unsigned BYTES>
 struct axis_transaction {
-  std::vector<axis_transfer> transfers; ///< Transfers making up the transaction
+  std::vector<axis_transfer<BYTES>> transfers; ///< Transfers making up the transaction
 
   /**
    * @brief Build a transaction from a byte vector.
@@ -154,6 +213,27 @@ struct axis_transaction {
 
       off += BYTES;
     }
+
+    return txn;
+  }
+
+  /**
+   * @brief Groups all valid bytes from transfers into one byte vector.
+   *
+   * @return Flat byte vector of the transaction.
+   */
+  std::vector<uint8_t> to_bytes() const {
+    std::vector<uint8_t> out;
+
+    for (auto& t: transfers) {
+      for (unsigned i = 0; i < BYTES; i++) {
+        if (t.tkeep[i]) {
+          out.push_back(t.tdata[i]);
+        }
+      }
+    }
+
+    return out;
   }
 
   /**
