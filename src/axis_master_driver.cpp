@@ -10,7 +10,7 @@
 // Constructor
 //-------------------------------------
 template <unsigned BYTES>
-axis_master_driver<BYTES>::axis_master_driver(const axis_if<BYTES>& mif, DoneCB done)
+axis_master_driver<BYTES>::axis_master_driver(axis_if<BYTES>& mif, DoneCB done)
   :mif_(mif), done_(done) {
 
   if (mif_.direction != axis_if<BYTES>::MASTER) {
@@ -45,18 +45,26 @@ void axis_master_driver<BYTES>::eval() {
     }
   }
 
-  if  (!transfer_pending_ && !current_txn_.empty()) {
+  if  (!transfer_pending_ && !current_txn_.empty()) { // no ongoing transfer and more transfers to send
     // drive next transfer
     drive(current_txn_.transfers[transfer_idx_]);
+
+    // ongoing transfer flag
     transfer_pending_ = true;
-  } else if (!transfer_pending_ && !queue_.empty()) {
-    // start next transaction
+  } else if (!transfer_pending_ && !queue_.empty()) { // no ongoing transfer and there are more transactions
+    // grab next transaction
     current_txn_ = queue_.front();
     queue_.pop();
+
+    // reset transfer count
     transfer_idx_ = 0;
+
+    // send first transfer in current transaction
     drive(current_txn_.transfers[transfer_idx_]);
+
+    // update ongoing transfer flag
     transfer_pending_ = true;
-  } else if (!transfer_pending_) {
+  } else if (!transfer_pending_) { // current transfer is done
     // nothing to send, deassert tvalid
     deassert();
   }
@@ -83,8 +91,8 @@ void axis_master_driver<BYTES>::set_done_cb(DoneCB cb) {
 template <unsigned BYTES>
 void axis_master_driver<BYTES>::drive(const Transfer& t) {
   *mif_.tvalid = 1;
-  std::memcpy(mif_.tdata, t.tdata, BYTES);
-  std::memcpy(mif_.tkeep, t.tkeep, BYTES);
+  std::memcpy(mif_.data, t.tdata, BYTES);
+  std::memcpy(mif_.keep, t.tkeep, BYTES);
   *mif_.tlast = t.tlast? 1 : 0;
 }
 
@@ -92,18 +100,23 @@ template <unsigned BYTES>
 void axis_master_driver<BYTES>::deassert() {
   *mif_.tvalid = 0;
   *mif_.tlast  = 0;
-  std::memset(mif_.tdata, 0, BYTES);
-  std::memset(mif_.tkeep, 0, BYTES);
+  std::memset(mif_.data, 0, BYTES);
+  std::memset(mif_.keep, 0, BYTES);
 }
 
 template <unsigned BYTES>
 void axis_master_driver<BYTES>::advance() {
   ++transfer_idx_;
 
-  if (transfer_idx_ >= current_txn_.transfers.size()) {
+  if (transfer_idx_ >= current_txn_.transfers.size()) { // AXI-S transaction done
     if (done_) {
+      // fire callback
       done_(current_txn_);
+
+      // clear transaction buffer
       current_txn_  = Transaction{};
+
+      // reset transfer count
       transfer_idx_ = 0;
     }
   }

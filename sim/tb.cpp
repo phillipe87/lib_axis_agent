@@ -105,16 +105,16 @@ int main(int argc, char** argv) {
   // AXIS into DUT
   m_axis.direction = axis_if<BYTES>::MASTER;
   m_axis.tvalid = &dut->s_tvalid_i;
-  m_axis.tdata  = reinterpret_cast<uint8_t*>(&dut->s_tdata_i);
-  m_axis.tkeep  = reinterpret_cast<uint8_t*>(&dut->s_tkeep_i);
+  m_axis.tdata  = &dut->s_tdata_i ;
+  m_axis.tkeep  = &dut->s_tkeep_i ;
   m_axis.tlast  = &dut->s_tlast_i ;
   m_axis.tready = &dut->s_tready_o;
 
   // AXIS out of DUT
   s_axis.direction = axis_if<BYTES>::SLAVE;
   s_axis.tvalid = &dut->m_tvalid_o;
-  s_axis.tdata  = reinterpret_cast<uint8_t*>(&dut->m_tdata_o);
-  s_axis.tkeep  = reinterpret_cast<uint8_t*>(&dut->m_tkeep_o);
+  s_axis.tdata  = &dut->m_tdata_o ;
+  s_axis.tkeep  = &dut->m_tkeep_o ;
   s_axis.tlast  = &dut->m_tlast_o ;
   s_axis.tready = &dut->m_tready_i;
   dut->m_tready_i = 1;
@@ -190,10 +190,13 @@ int main(int argc, char** argv) {
     // Rising edge
     dut->clk_i = 1;
     driver.eval();
+    m_axis.update();
+    std::cout << "cy=" << cy << " in_if.data[0]=" << std::hex << (int)m_axis.data[0]
+              << " dut->s_tdata=" << std::hex << dut->s_tdata_i << "\n";
     dut->eval();
     ctx.timeInc(1);
     tfp->dump(ctx.time());
-
+    s_axis.update();
     //mon_in.eval();
     //mon_out.eval();
 

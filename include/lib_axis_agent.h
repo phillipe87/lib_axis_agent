@@ -103,7 +103,17 @@ struct axis_if {
       } // tdata
 
       if (tkeep) {
-        *static_cast<CData*>(tkeep) = keep[0];
+        uint8_t packed;
+
+        packed = 0;
+
+        for (unsigned i=0; i<BYTES; i++) {
+          if (keep[i]) {
+            packed |= (1u << i);
+          }
+        }
+
+        *static_cast<CData*>(tkeep) = packed;
       } // tkeep
 
     } else { // From DUT
@@ -320,7 +330,7 @@ class axis_master_driver {
      *
      * @throws std::invalid_argument if @p mif.direction != MASTER.
      */
-    explicit axis_master_driver(const axis_if<BYTES>& mif, DoneCB done = nullptr);
+    explicit axis_master_driver(axis_if<BYTES>& mif, DoneCB done = nullptr);
 
     /**
      * @brief Transmits data bytes contained in an axis_transaction struct.
@@ -362,7 +372,7 @@ class axis_master_driver {
     void set_done_cb(DoneCB cb);
 
   private:
-    axis_if<BYTES>          mif_;
+    axis_if<BYTES>&         mif_;
     DoneCB                  done_;
     std::queue<Transaction> queue_;
     Transaction             current_txn_;
@@ -371,6 +381,10 @@ class axis_master_driver {
 
     void drive(const Transfer& t);
     void deassert();
+
+    /**
+     * @brief Advance to the next transfer, fire on_done_ and reset state at end-of-transaction.
+     */
     void advance();
 };
 
