@@ -30,7 +30,7 @@ void axis_monitor<BYTES>::eval() {
 
 
   // Add captured transfer to current transaction's queue
-  current_.push_back(transfer);
+  current_.transfers.push_back(transfer);
 
   // If it's the last transfer
   if (*iface_.tlast) {
@@ -53,12 +53,11 @@ bool axis_monitor<BYTES>::has_transaction() const {
 }
 
 template <unsigned BYTES>
-typename axis_monitor<BYTES>::Transaction pop_transaction() {
-  if (!has_transaction()) {
-    return;
-  }
+typename axis_monitor<BYTES>::Transaction axis_monitor<BYTES>::pop_transaction() {
 
-  return rx_queue_.pop();
+  auto txn = rx_queue_.front();
+  rx_queue_.pop();
+  return txn;
 }
 
 template <unsigned BYTES>
@@ -70,3 +69,11 @@ template <unsigned BYTES>
 void axis_monitor<BYTES>::set_transaction_cb(TxnCB cb) {
   on_txn_ = cb;
 }
+
+template class axis_monitor<1>;
+template class axis_monitor<2>;
+template class axis_monitor<4>;
+template class axis_monitor<8>;
+template class axis_monitor<16>;
+template class axis_monitor<32>;
+template class axis_monitor<64>;

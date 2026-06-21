@@ -30,21 +30,20 @@ module axis_passthrough #(
   // -- buffer is empty - buf_valid=0
   // OR
   // -- buffer gets emptied - m_tready=1
-  assign s_tready_c = !buf_valid_r || m_tready_r;
+  assign s_tready_c = !buf_valid_r || m_tready_i;
 
   always_ff @(posedge clk_i) begin
     if (rst_i) begin
       buf_valid_r <= 0;
-    end else if ( (s_tvalid_i && s_tready_r) && (m_tready_i || !buf_valid_r) ) begin // assert when buffering transfer while emptying buffer or while buffer is empty
+    end else if ( (s_tvalid_i && s_tready_c) && (m_tready_i || !buf_valid_r) ) begin // assert when buffering transfer while emptying buffer or while buffer is empty
       buf_valid_r <= 1;
-    end else if (!(s_tvalid_i && s_tready_r) && m_tready_i) begin // deassert when emptying buffer with no incoming transfer
+    end else if (!(s_tvalid_i && s_tready_c) && m_tready_i) begin // deassert when emptying buffer with no incoming transfer
       buf_valid_r <= 0;
     end
   end
 
   always_ff @(posedge clk_i) begin
-    if ( (s_tvalid_i && s_tready_r) && (m_tready_i || !buf_valid_r) ) begin // buffer transfer while emptying buffer or while buffer is empty
-      buf_valid_r <= 1;
+    if ( (s_tvalid_i && s_tready_c) && (m_tready_i || !buf_valid_r) ) begin // buffer transfer while emptying buffer or while buffer is empty
       buf_data_r  <= s_tdata_i;
       buf_keep_r  <= s_tkeep_i;
       buf_last_r  <= s_tlast_i;

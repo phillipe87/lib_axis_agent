@@ -3,8 +3,8 @@
  * @brief Implementation of axis_master_driver.
  */
 
- #include "lib_axis_agent.h"
- #include <stdexcept>
+#include "lib_axis_agent.h"
+#include <stdexcept>
 
 //-------------------------------------
 // Constructor
@@ -32,7 +32,7 @@ void axis_master_driver<BYTES>::send_txn(const Transaction& txn) {
 
 template <unsigned BYTES>
 void axis_master_driver<BYTES>::send_bytes(const std::vector<uint8_t>& byte_vec) {
-  send(Transaction::from_bytes(byte_vec));
+  send_txn(Transaction::from_bytes(byte_vec));
 }
 
 
@@ -54,7 +54,7 @@ void axis_master_driver<BYTES>::eval() {
     current_txn_ = queue_.front();
     queue_.pop();
     transfer_idx_ = 0;
-    driver(current_txn_.transfers[transfer_idx_]);
+    drive(current_txn_.transfers[transfer_idx_]);
     transfer_pending_ = true;
   } else if (!transfer_pending_) {
     // nothing to send, deassert tvalid
@@ -85,7 +85,7 @@ void axis_master_driver<BYTES>::drive(const Transfer& t) {
   *mif_.tvalid = 1;
   std::memcpy(mif_.tdata, t.tdata, BYTES);
   std::memcpy(mif_.tkeep, t.tkeep, BYTES);
-  *mif_.tlast = t.last? 1 : 0;
+  *mif_.tlast = t.tlast? 1 : 0;
 }
 
 template <unsigned BYTES>
@@ -108,3 +108,11 @@ void axis_master_driver<BYTES>::advance() {
     }
   }
 }
+
+template class axis_master_driver<1>;
+template class axis_master_driver<2>;
+template class axis_master_driver<4>;
+template class axis_master_driver<8>;
+template class axis_master_driver<16>;
+template class axis_master_driver<32>;
+template class axis_master_driver<64>;

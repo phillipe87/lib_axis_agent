@@ -128,8 +128,9 @@ struct axis_if {
       if (tkeep) {
         keep[0] = *static_cast<CData*>(tkeep);
       }
-  } // if (direction == MASTER)
- };
+    } // if (direction == MASTER)
+  }
+};
 
  /**
   * @brief One AXI-Stream transfer.
@@ -218,9 +219,46 @@ struct axis_transaction {
   }
 
   /**
-   * @brief Groups all valid bytes from transfers into one byte vector.
+  * @brief Build a transaction from a vector of Verilator-native words.
+  *
+  * Each word represents one full transfer's worth of data, matching the
+  * Verilator type Verilator itself would generate for a TDATA signal of
+  * this width (CData/SData/IData/QData for 1/2/4/8 bytes respectively).
+  *
+  * @tparam WORD_T Verilator word type. Must be CData, SData, IData, or
+  *                QData, matching BYTES exactly.
+  * @param words   Vector of words, one per transfer.
+  * @return        Populated axis_transaction with one transfer per word,
+  *                tlast=1 on the final word, full tkeep (all lanes valid).
+  */
+  template <typename WORD_T>
+  static axis_transaction from_words(const std::vector<WORD_T>& words) {
+    static_assert(sizeof(WORD_T) == BYTES,
+      "from_words: WORD_T size must match BYTES "
+      "(use CData/SData/IData/QData matching the bus width)");
+
+    axis_transaction txn;
+
+    for (std::size_t i = 0; i < words.size(); ++i) {
+      axis_transfer<BYTES> t;
+
+      std::memcpy(t.tdata, &words[i], BYTES);
+
+      std::memset(t.tkeep, 1, BYTES); // full word — all lanes valid
+
+      t.tlast = (i == words.size() - 1);
+
+      txn.transfers.push_back(t);
+    }
+    return txn;
+  }
+
+  /**
+   * @brief Flatten all valid bytes back into a byte vector.
    *
-   * @return Flat byte vector of the transaction.
+   * Only bytes whose @c tkeep lane is set are included.
+   *
+   * @return Flat byte vector of the transaction payload.
    */
   std::vector<uint8_t> to_bytes() const {
     std::vector<uint8_t> out;
