@@ -16,7 +16,18 @@ without the UVM runtime overhead.
 include/
   axis_agent.h (A single header containing all declarations and types)
 src/
+  axis_master_driver.cpp (Driver component)
+  axis_monitor.cpp (Monitor component)
 CMakeLists.txt
+```
+
+## Build
+```bash
+cmake --build build --target clean
+
+cmake -B build -DBUILD_SIM=ON -Dverilator_DIR=${VERILATOR_ROOT}
+
+cmake --build build -j4
 ```
 
 ## Requirements

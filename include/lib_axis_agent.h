@@ -467,3 +467,45 @@ class axis_monitor {
     std::queue<Transaction> rx_queue_;
     Transaction             current_;
 };
+
+template <unsigned BYTES>
+class axis_agent {
+  public:
+    enum AgentMode {ACTIVE, PASSIVE};
+
+    using Transaction = axis_transaction<BYTES>;
+    using DoneCB      = typename axis_master_driver<BYTES>::DoneCB;
+    using TxnCB       = typename axis_monitor<BYTES>::TxnCB;
+
+    /**
+     * @brief Constructs the AXI-stream agent bound to @p mif.
+     *
+     * @param iface           Interface to the DUT.
+     * @param mode            ACTIVE adds a driver; PASSIVE creates monitor only.
+     * @param on_driver_done  Optional callback evoked after transmission is done.
+     * @param on_monitor_done Optional callback evoked after an AXI-S transaction is captured.
+     *
+     * @throws std::invalid_argument if @p iface.direction doesn't match @p mode.
+     */
+    explicit axis_agent(axis_if<BYTES>& iface,
+                        AgentMode       mode = ACTIVE,
+                        DoneCB          on_driver_done  = nullptr,
+                        TxnCB           on_monitor_done = nullptr);
+
+    axis_master_driver<BYTES>* driver()  { return driver_.get(); }
+    axis_monitor<BYTES>&       monitor() { return monitor_;      }
+
+    void pre_eval();
+    void post_eval();
+    void send_txn(const Transaction& txn);
+    bool is_idle() const;
+    std::size_t queued_transactions() const;
+
+  private:
+    axis_if<BYTES>& iface_;
+    AgentMode       mode_;
+
+    // components
+    std::unique_ptr<axis_master_driver<BYTES>> driver_;
+    axis_monitor<BYTES>                        monitor_;
+};
